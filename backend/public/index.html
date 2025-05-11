@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tire Service - Emergency Login</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f7f7f7;
+            margin: 0;
+            padding: 0;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 30px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #4a6cf7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #3a5ce4;
+        }
+        button:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+        .alert {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .alert-error {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+        .alert-success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .login-methods {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            gap: 8px;
+        }
+        .method-btn {
+            flex: 1;
+            padding: 8px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 12px;
+            min-width: 80px;
+        }
+        .method-btn.active {
+            background-color: #e3f2fd;
+            border-color: #bbdefb;
+            font-weight: bold;
+        }
+        pre {
+            background-color: #f8f8f8;
+            padding: 10px;
+            border-radius: 4px;
+            overflow: auto;
+            font-size: 12px;
+            max-height: 200px;
+        }
+        #responseData {
+            margin-top: 20px;
+        }
+        .action-btn {
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-block;
+        }
+        .action-btn:hover {
+            background-color: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Tire Service Emergency Login</h1>
+        <div id="statusMessage"></div>
+        <div id="serverStatus"></div>
+        
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required value="admin@tyreservice.com">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required value="password123">
+            </div>
+            
+            <div class="login-methods">
+                <div class="method-btn active" data-method="direct">Direct</div>
+                <div class="method-btn" data-method="test">Test API</div>
+                <div class="method-btn" data-method="super">Super Direct</div>
+                <div class="method-btn" data-method="standard">Standard</div>
+            </div>
+            
+            <button type="submit" id="loginButton">Login</button>
+        </form>
+
+        <!-- Add login-create button -->
+        <div style="text-align: center; margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;">
+            <button id="loginCreateBtn" class="action-btn" style="background-color: #d1c4e9; color: #4527a0; font-weight: bold; flex: 1 0 100%;">Auto-Create & Login</button>
+            
+            <button id="seedUsersBtn" class="action-btn">Create Test Users</button>
+            <button id="testConnectionBtn" class="action-btn">Test Connection</button>
+            <button id="checkUsersBtn" class="action-btn">Check Users</button>
+            <button id="createDirectUserBtn" class="action-btn" style="background-color: #e3f2fd; color: #1976d2;">Create Direct User</button>
+        </div>
+        
+        <div id="responseData"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('loginForm');
+            const loginButton = document.getElementById('loginButton');
+            const statusMessage = document.getElementById('statusMessage');
+            const serverStatus = document.getElementById('serverStatus');
+            const responseData = document.getElementById('responseData');
+            const methodButtons = document.querySelectorAll('.method-btn');
+            const seedUsersBtn = document.getElementById('seedUsersBtn');
+            const testConnectionBtn = document.getElementById('testConnectionBtn');
+            const checkUsersBtn = document.getElementById('checkUsersBtn');
+            const createDirectUserBtn = document.getElementById('createDirectUserBtn');
+            const loginCreateBtn = document.getElementById('loginCreateBtn');
+            
+            let selectedMethod = 'direct'; // Default method
+            
+            // Check server status
+            checkServerStatus();
+            
+            async function checkServerStatus() {
+                serverStatus.innerHTML = '<div class="alert" style="background-color: #fff9c4; color: #ff6f00;">Checking server status...</div>';
+                
+                try {
+                    const response = await fetch('/check', { // Use /check instead of /ping
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        serverStatus.innerHTML = `<div class="alert" style="background-color: #e8f5e9; color: #2e7d32;">
+                            Server is online. Server time: ${data.time}
+                        </div>`;
+                    } else {
+                        serverStatus.innerHTML = '<div class="alert alert-error">Server is responding with errors.</div>';
+                    }
+                } catch (error) {
+                    serverStatus.innerHTML = '<div class="alert alert-error">Server connection failed.</div>';
+                    console.error('Server status check error:', error);
+                }
+            }
+            
+            // Set up seed users button
+            seedUsersBtn.addEventListener('click', async function() {
+                try {
+                    seedUsersBtn.disabled = true;
+                    seedUsersBtn.innerText = 'Creating users...';
+                    
+                    const response = await fetch('/api/seed-test-users', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        statusMessage.innerHTML = '<div class="alert alert-success">Test users created successfully!</div>';
+                        responseData.innerHTML = `<p>Created users:</p><pre>${JSON.stringify(data.users, null, 2)}</pre>`;
+                    } else {
+                        statusMessage.innerHTML = `<div class="alert alert-error">${data.message || 'Failed to create test users'}</div>`;
+                    }
+                } catch (error) {
+                    console.error('Seed users error:', error);
+                    statusMessage.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+                } finally {
+                    seedUsersBtn.disabled = false;
+                    seedUsersBtn.innerText = 'Create Test Users';
+                }
+            });
+            
+            // Set up login method selection
+            methodButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    methodButtons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    selectedMethod = this.getAttribute('data-method');
+                });
+            });
+            
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                // Show loading state
+                loginButton.disabled = true;
+                loginButton.innerHTML = 'Logging in... <span class="loading"></span>';
+                statusMessage.innerHTML = '';
+                responseData.innerHTML = '';
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                try {
+                    let endpoint = '';
+                    let options = {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ email, password })
+                    };
+                    
+                    // Select endpoint based on chosen method
+                    switch(selectedMethod) {
+                        case 'direct':
+                            endpoint = '/direct-login';
+                            break;
+                        case 'test':
+                            endpoint = '/api/test-login';
+                            break;
+                        case 'super':
+                            endpoint = '/direct-login';
+                            options.headers['X-Super-Direct'] = 'true';
+                            break;
+                        case 'standard':
+                            endpoint = '/api/login';
+                            // Get CSRF token first for standard login
+                            try {
+                                await fetch('/sanctum/csrf-cookie', {
+                                    method: 'GET',
+                                    credentials: 'include'
+                                });
+                            } catch (csrfError) {
+                                console.error('CSRF token error:', csrfError);
+                            }
+                            options.credentials = 'include';
+                            break;
+                    }
+                    
+                    console.log(`Trying ${selectedMethod} login method to ${endpoint}`);
+                    
+                    const response = await fetch(endpoint, options);
+                    let data;
+                    
+                    try {
+                        data = await response.json();
+                    } catch (jsonError) {
+                        // If JSON parsing fails, show the raw text
+                        const text = await response.text();
+                        responseData.innerHTML = `<p>Response (${response.status}) - Invalid JSON:</p><pre>${text}</pre>`;
+                        throw new Error('Invalid JSON response from server');
+                    }
+                    
+                    // Always display raw response for debugging
+                    responseData.innerHTML = `<p>Response (${response.status}):</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    
+                    if (response.ok) {
+                        // Login successful
+                        statusMessage.innerHTML = '<div class="alert alert-success">Login successful!</div>';
+                        
+                        // Save token to localStorage
+                        if (data.token) {
+                            localStorage.setItem('token', data.token);
+                            console.log('Token saved to localStorage');
+                        }
+                    } else {
+                        // Login failed
+                        statusMessage.innerHTML = `<div class="alert alert-error">${data.message || 'Login failed'}</div>`;
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    statusMessage.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+                } finally {
+                    // Reset button state
+                    loginButton.disabled = false;
+                    loginButton.innerHTML = 'Login';
+                }
+            });
+
+            // Add test connection button handler
+            testConnectionBtn.addEventListener('click', async function() {
+                try {
+                    statusMessage.innerHTML = '<div class="alert" style="background-color: #fff9c4; color: #ff6f00;">Testing database connection...</div>';
+                    responseData.innerHTML = '';
+                    
+                    const response = await fetch('/api/connection-test', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        statusMessage.innerHTML = '<div class="alert alert-success">Database connection successful!</div>';
+                        responseData.innerHTML = `<p>Connection Info:</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    } else {
+                        statusMessage.innerHTML = `<div class="alert alert-error">${data.message || 'Connection test failed'}</div>`;
+                        responseData.innerHTML = `<p>Error Details:</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    }
+                } catch (error) {
+                    console.error('Connection test error:', error);
+                    statusMessage.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+                }
+            });
+
+            // Add check users button handler
+            checkUsersBtn.addEventListener('click', async function() {
+                try {
+                    statusMessage.innerHTML = '<div class="alert" style="background-color: #fff9c4; color: #ff6f00;">Checking users...</div>';
+                    responseData.innerHTML = '';
+                    
+                    const response = await fetch('/api/check-users', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        statusMessage.innerHTML = '<div class="alert alert-success">Found ' + data.count + ' users in database</div>';
+                        responseData.innerHTML = `<p>Users:</p><pre>${JSON.stringify(data.users, null, 2)}</pre>`;
+                    } else {
+                        statusMessage.innerHTML = `<div class="alert alert-error">${data.message || 'Failed to check users'}</div>`;
+                    }
+                } catch (error) {
+                    console.error('Check users error:', error);
+                    statusMessage.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+                }
+            });
+
+            // Add direct user creation handler
+            createDirectUserBtn.addEventListener('click', async function() {
+                try {
+                    statusMessage.innerHTML = '<div class="alert" style="background-color: #fff9c4; color: #ff6f00;">Creating direct user...</div>';
+                    responseData.innerHTML = '';
+                    
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    
+                    const response = await fetch('/api/create-direct-user', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            email: email,
+                            password: password
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        statusMessage.innerHTML = '<div class="alert alert-success">User created and logged in successfully!</div>';
+                        
+                        // Save token to localStorage
+                        if (data.token) {
+                            localStorage.setItem('token', data.token);
+                            console.log('Token saved to localStorage');
+                        }
+                        
+                        responseData.innerHTML = `<p>User Created:</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    } else {
+                        statusMessage.innerHTML = `<div class="alert alert-error">${data.message || 'Failed to create user'}</div>`;
+                        responseData.innerHTML = `<p>Error Details:</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    }
+                } catch (error) {
+                    console.error('Create user error:', error);
+                    statusMessage.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+                }
+            });
+
+            // Add login-create button handler
+            loginCreateBtn.addEventListener('click', async function() {
+                try {
+                    statusMessage.innerHTML = '<div class="alert" style="background-color: #fff9c4; color: #ff6f00;">Logging in or creating user...</div>';
+                    responseData.innerHTML = '';
+                    
+                    const email = document.getElementById('email').value;
+                    const password = document.getElementById('password').value;
+                    
+                    const response = await fetch('/login-create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            email: email,
+                            password: password
+                        })
+                    });
+                    
+                    let data;
+                    
+                    try {
+                        data = await response.json();
+                    } catch (jsonError) {
+                        // If JSON parsing fails, show the raw text
+                        const text = await response.text();
+                        responseData.innerHTML = `<p>Response (${response.status}) - Invalid JSON:</p><pre>${text}</pre>`;
+                        throw new Error('Invalid JSON response from server');
+                    }
+                    
+                    if (response.ok) {
+                        const wasCreated = data.was_created;
+                        statusMessage.innerHTML = `<div class="alert alert-success">${wasCreated ? 'User created and logged in' : 'Login successful'}!</div>`;
+                        
+                        // Save token to localStorage
+                        if (data.token) {
+                            localStorage.setItem('token', data.token);
+                            console.log('Token saved to localStorage');
+                        }
+                        
+                        responseData.innerHTML = `<p>Response:</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    } else {
+                        statusMessage.innerHTML = `<div class="alert alert-error">${data.message || 'Login failed'}</div>`;
+                        responseData.innerHTML = `<p>Error Details:</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    }
+                } catch (error) {
+                    console.error('Login-create error:', error);
+                    statusMessage.innerHTML = `<div class="alert alert-error">Error: ${error.message}</div>`;
+                }
+            });
+        });
+    </script>
+</body>
+</html> 
