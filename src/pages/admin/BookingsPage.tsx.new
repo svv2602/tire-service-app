@@ -1,0 +1,598 @@
+import React, { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
+import {
+  Box,
+  Typography,
+  Paper,
+  IconButton,
+  Chip,
+  TextField,
+  MenuItem,
+  TablePagination,
+  Tooltip,
+  FormControl,
+  InputLabel,
+  Select,
+  Button,
+  CircularProgress,
+  Alert,
+  Snackbar,
+  useTheme,
+  useMediaQuery
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  Edit as EditIcon,
+  Refresh as RefreshIcon,
+  Visibility as VisibilityIcon,
+  FilterList as FilterListIcon,
+  FilterAltOff as FilterAltOffIcon
+} from '@mui/icons-material';
+import { RootState } from '../../store';
+import { fetchBookings, updateBookingStatus, clearSelectedBooking, updateBooking } from '../../store/slices/bookingsSlice';
+import { fetchServicePoints } from '../../store/slices/servicePointsSlice';
+import { format } from 'date-fns';
+import { ru } from 'date-fns/locale';
+import BookingDetailsDialog from '../../components/bookings/BookingDetailsDialog';
+import { useAppDispatch } from '../../hooks/useAppDispatch';
+import BookingEditDialog from '../../components/bookings/BookingEditDialog';
+import AdaptiveDataTable from '../../components/ui/AdaptiveDataTable';
+
+// DatePicker imports
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return 'success';
+    case 'pending':
+      return 'warning';
+    case 'cancelled':
+      return 'error';
+    default:
+      return 'default';
+  }
+};
+
+const getStatusText = (status: string) => {
+  switch (status) {
+    case 'completed':
+      return 'Завершено';
+    case 'pending':
+      return 'Ожидает';
+    case 'cancelled':
+      return 'Отменено';
+    default:
+      return status;
+  }
+};
+
+// Helper function to safely format booking date
+const formatBookingDate = (date?: string, time?: string) => {
+  if (!date) return 'Дата не указана';
+  
+  try {
+    // Try to create a valid date-time string
+    let dateObj: Date;
+    
+    if (time) {
+      // Try to create a valid date-time string
+      dateObj = new Date(`${date}T${time}`);
+    } else {
+      dateObj = new Date(date);
+    }
+    
+    // Validate the date is valid
+    if (isNaN(dateObj.getTime())) {
+      return date;
+    }
+    
+    return format(dateObj, 'PPp', { locale: ru });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return date;
+  }
+};
+
+const BookingsPage = () => {
+  const dispatch = useAppDispatch();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  const { items: bookings, isLoading, error } = useSelector((state: RootState) => state.bookings);
+  const { items: servicePoints } = useSelector((state: RootState) => state.servicePoints);
+  
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterCity, setFilterCity] = useState('');
+  const [filterServicePoint, setFilterServicePoint] = useState('');
+  const [filterDate, setFilterDate] = useState<Date | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [currentBooking, setCurrentBooking] = useState<any>(null);
+  const [showFilters, setShowFilters] = useState(!isMobile); // Показываем фильтры по умолчанию на десктопе
+  const [snackbarMessage, setSnackbarMessage] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({ open: false, message: '', severity: 'success' });
+
+  // Get unique cities from service points
+  const cities = Array.from(
+    new Set(servicePoints.map(sp => sp.city).filter(Boolean))
+  ) as string[];
+
+  // Get service points for selected city
+  const cityServicePoints = filterCity 
+    ? servicePoints.filter(sp => sp.city === filterCity) 
+    : servicePoints;
+
+  useEffect(() => {
+    dispatch(fetchBookings());
+    dispatch(fetchServicePoints());
+  }, [dispatch]);
+
+  // Reset servicePoint filter when city changes
+  useEffect(() => {
+    setFilterServicePoint('');
+  }, [filterCity]);
+
+  // Обновляем состояние showFilters при изменении размера экрана
+  useEffect(() => {
+    setShowFilters(!isMobile);
+  }, [isMobile]);
+
+  const handleStatusChange = async (bookingId: number, newStatus: string) => {
+    await dispatch(updateBookingStatus({ id: bookingId, status: newStatus }));
+    dispatch(fetchBookings());
+  };
+
+  const handleDetailsClick = (bookingId: number) => {
+    setSelectedBookingId(bookingId);
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedBookingId(null);
+    dispatch(clearSelectedBooking());
+  };
+
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const handleEditBooking = (booking: any) => {
+    // Ensure the booking has a valid servicePointId
+    const hasValidServicePointId = booking.servicePointId !== undefined;
+    
+    if (!hasValidServicePointId) {
+      console.error('Booking is missing servicePointId:', booking);
+      
+      // Try to find a service point ID from the first available service point
+      const defaultServicePointId = servicePoints.length > 0 ? servicePoints[0].id : 0;
+      
+      console.log(`Assigning default service point ID ${defaultServicePointId} to booking ${booking.id}`);
+      booking = { ...booking, servicePointId: defaultServicePointId };
+    }
+    
+    // Сделаем полную копию объекта бронирования, чтобы гарантировать наличие всех полей
+    const bookingWithDefaults = {
+      id: booking.id,
+      clientName: booking.clientName || '',
+      phone: booking.phone || '',
+      carNumber: booking.carNumber || '',
+      vehicleBrand: booking.vehicleBrand || '',
+      vehicleType: booking.vehicleType || '',
+      date: booking.date || new Date().toISOString().split('T')[0],
+      time: booking.time || '',
+      status: booking.status || 'pending',
+      servicePointId: booking.servicePointId
+    };
+    
+    console.log('BookingsPage: Открываем форму редактирования с данными:', bookingWithDefaults);
+    
+    setCurrentBooking(bookingWithDefaults);
+    setEditDialogOpen(true);
+  };
+
+  const handleCloseEditDialog = () => {
+    setEditDialogOpen(false);
+    setCurrentBooking(null);
+  };
+
+  const handleSaveBookingChanges = async (updatedBooking: any) => {
+    try {
+      console.log('BookingsPage: Сохраняем изменения в записи:', updatedBooking);
+      
+      // Убедимся, что все необходимые поля присутствуют
+      const requiredFields = ['id', 'clientName', 'phone', 'carNumber', 'date', 'time', 'servicePointId'];
+      const missingFields = requiredFields.filter(field => 
+        updatedBooking[field] === undefined || updatedBooking[field] === null);
+      
+      if (missingFields.length > 0) {
+        console.error(`BookingsPage: Отсутствуют обязательные поля: ${missingFields.join(', ')}`);
+        setSnackbarMessage({
+          open: true,
+          message: `Ошибка обновления: отсутствуют поля ${missingFields.join(', ')}`,
+          severity: 'error'
+        });
+        return;
+      }
+      
+      // Принудительно преобразуем ID и servicePointId в числа
+      const normalizedBooking = {
+        ...updatedBooking,
+        id: Number(updatedBooking.id),
+        servicePointId: Number(updatedBooking.servicePointId),
+        // Явно указываем все поля, чтобы быть уверенными что они будут переданы в редьюсер
+        clientName: updatedBooking.clientName || '',
+        phone: updatedBooking.phone || '',
+        carNumber: updatedBooking.carNumber || '',
+        vehicleBrand: updatedBooking.vehicleBrand || '',
+        vehicleType: updatedBooking.vehicleType || '',
+        date: updatedBooking.date || '',
+        time: updatedBooking.time || '',
+        status: updatedBooking.status || 'pending'
+      };
+      
+      // Диспатчим экшн обновления записи
+      console.log('BookingsPage: Отправляем данные в Redux store:', normalizedBooking);
+      const result = await dispatch(updateBooking(normalizedBooking)).unwrap();
+      
+      console.log('BookingsPage: Запись успешно обновлена:', result);
+      
+      // Закрываем диалог редактирования
+      setEditDialogOpen(false);
+      setCurrentBooking(null);
+      
+      // После успешного обновления принудительно обновляем список записей
+      await dispatch(fetchBookings());
+      
+      // Устанавливаем сообщение об успешном обновлении
+      setSnackbarMessage({
+        open: true,
+        message: 'Запись успешно обновлена',
+        severity: 'success'
+      });
+      
+    } catch (error) {
+      console.error('BookingsPage: Ошибка при обновлении записи:', error);
+      setSnackbarMessage({
+        open: true,
+        message: `Ошибка обновления: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`,
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleSnackbarClose = () => {
+    setSnackbarMessage({
+      ...snackbarMessage,
+      open: false
+    });
+  };
+
+  const resetFilters = () => {
+    setFilterStatus('all');
+    setFilterCity('');
+    setFilterServicePoint('');
+    setFilterDate(null);
+    setSearchQuery('');
+    setPage(0);
+  };
+
+  const getVehicleTypeLabel = (type?: string) => {
+    if (!type) return '';
+    switch (type) {
+      case 'car':
+        return 'Легковая';
+      case 'SUV':
+        return 'Внедорожник';
+      case 'truck':
+        return 'Грузовая';
+      default:
+        return type;
+    }
+  };
+
+  // Фильтрация данных
+  const filteredBookings = bookings.filter(booking => {
+    const matchesStatus = filterStatus === 'all' || booking.status === filterStatus;
+    const bookingServicePoint = servicePoints.find(sp => sp.id === booking.servicePointId);
+    const matchesCity = !filterCity || (bookingServicePoint && bookingServicePoint.city === filterCity);
+    const matchesServicePoint = !filterServicePoint || 
+      booking.servicePointId === parseInt(filterServicePoint);
+    
+    let matchesDate = true;
+    if (filterDate) {
+      const bookingDate = new Date(booking.date);
+      const filterDateObj = new Date(filterDate);
+      matchesDate = bookingDate.toDateString() === filterDateObj.toDateString();
+    }
+    
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = !searchQuery || 
+      (booking.clientName && booking.clientName.toLowerCase().includes(searchLower)) ||
+      (booking.phone && booking.phone.toLowerCase().includes(searchLower)) ||
+      (booking.carNumber && booking.carNumber.toLowerCase().includes(searchLower)) ||
+      (booking.vehicleBrand && booking.vehicleBrand.toLowerCase().includes(searchLower));
+      
+    return matchesStatus && matchesCity && matchesServicePoint && matchesDate && matchesSearch;
+  });
+
+  // Пагинация
+  const paginatedBookings = filteredBookings.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  return (
+    <>
+      <Paper sx={{ width: '100%', overflow: 'hidden', mb: 3 }}>
+        <Box sx={{ p: { xs: 1, sm: 2 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+            <Typography variant="h5" component="h1" sx={{ mr: 'auto' }}>
+              Управление записями
+            </Typography>
+            
+            {/* На мобильных - кнопка для показа/скрытия фильтров */}
+            {isMobile && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setShowFilters(!showFilters)}
+                startIcon={showFilters ? <FilterAltOffIcon /> : <FilterListIcon />}
+              >
+                {showFilters ? 'Скрыть фильтры' : 'Показать фильтры'}
+              </Button>
+            )}
+          </Box>
+          
+          {/* Фильтры */}
+          {showFilters && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+              {/* Строка поиска */}
+              <Box sx={{ flex: '1 1 240px', minWidth: { xs: '100%', sm: 'auto' } }}>
+                <TextField
+                  label="Поиск"
+                  placeholder="Имя, телефон, авто..."
+                  fullWidth
+                  size="small"
+                  variant="outlined"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: <SearchIcon fontSize="small" sx={{ mr: 1, opacity: 0.7 }} />,
+                  }}
+                />
+              </Box>
+              
+              {/* Фильтр по городу */}
+              <Box sx={{ flex: '1 1 160px', minWidth: { xs: '100%', sm: 'auto' } }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Город</InputLabel>
+                  <Select
+                    value={filterCity}
+                    label="Город"
+                    onChange={(e) => setFilterCity(e.target.value)}
+                  >
+                    <MenuItem value="">Все города</MenuItem>
+                    {cities.map((city) => (
+                      <MenuItem key={city} value={city}>{city}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+              
+              {/* Фильтр по точке обслуживания */}
+              <Box sx={{ flex: '1 1 200px', minWidth: { xs: '100%', sm: 'auto' } }}>
+                <FormControl fullWidth size="small" disabled={!filterCity}>
+                  <InputLabel>Точка обслуживания</InputLabel>
+                  <Select
+                    value={filterServicePoint}
+                    label="Точка обслуживания"
+                    onChange={(e) => setFilterServicePoint(e.target.value)}
+                  >
+                    <MenuItem value="">Все точки</MenuItem>
+                    {cityServicePoints.map((sp) => (
+                      <MenuItem key={sp.id} value={sp.id.toString()}>
+                        {sp.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+              
+              {/* Фильтр по дате */}
+              <Box sx={{ flex: '1 1 180px', minWidth: { xs: '100%', sm: 'auto' } }}>
+                <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ru}>
+                  <DatePicker
+                    label="Дата"
+                    value={filterDate}
+                    onChange={(date) => setFilterDate(date)}
+                    slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                  />
+                </LocalizationProvider>
+              </Box>
+              
+              {/* Фильтр по статусу */}
+              <Box sx={{ flex: '1 1 160px', minWidth: { xs: '100%', sm: 'auto' } }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Статус</InputLabel>
+                  <Select
+                    value={filterStatus}
+                    label="Статус"
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                  >
+                    <MenuItem value="all">Все статусы</MenuItem>
+                    <MenuItem value="pending">Ожидает</MenuItem>
+                    <MenuItem value="completed">Завершено</MenuItem>
+                    <MenuItem value="cancelled">Отменено</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              
+              {/* Кнопка сброса фильтров */}
+              <Box sx={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', ml: 'auto' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={resetFilters}
+                  startIcon={<RefreshIcon />}
+                >
+                  Сбросить фильтры
+                </Button>
+              </Box>
+            </Box>
+          )}
+
+          {/* Таблица с адаптивным отображением */}
+          {isLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+              <CircularProgress />
+            </Box>
+          ) : error ? (
+            <Alert severity="error" sx={{ my: 2 }}>
+              {typeof error === 'string' ? error : 'Произошла ошибка при загрузке данных'}
+            </Alert>
+          ) : (
+            <Box sx={{ mt: 2, width: '100%', overflowX: 'hidden' }}>
+              <AdaptiveDataTable
+                data={paginatedBookings}
+                columns={[
+                  { id: 'id', label: 'ID', width: '5%' },
+                  { id: 'clientName', label: 'Клиент', width: '15%' },
+                  { id: 'phone', label: 'Телефон', width: '12%' },
+                  { 
+                    id: 'vehicleBrand', 
+                    label: 'Автомобиль', 
+                    width: '13%',
+                    cellRenderer: (value, row) => (
+                      <>
+                        {row.vehicleBrand}
+                        {row.vehicleType && ` (${getVehicleTypeLabel(row.vehicleType)})`}
+                      </>
+                    )
+                  },
+                  { id: 'carNumber', label: 'Гос.номер', width: '10%' },
+                  { 
+                    id: 'city', 
+                    label: 'Город', 
+                    width: '8%',
+                    cellRenderer: (value, row) => {
+                      const sp = servicePoints.find(sp => sp.id === row.servicePointId);
+                      return sp?.city || '-';
+                    }
+                  },
+                  { 
+                    id: 'servicePoint', 
+                    label: 'Сервисная точка', 
+                    width: '12%',
+                    cellRenderer: (value, row) => {
+                      const sp = servicePoints.find(sp => sp.id === row.servicePointId);
+                      return sp?.name || '-';
+                    }
+                  },
+                  { 
+                    id: 'date', 
+                    label: 'Дата/Время', 
+                    width: '12%',
+                    cellRenderer: (value, row) => formatBookingDate(row.date, row.time)
+                  },
+                  { 
+                    id: 'status', 
+                    label: 'Статус', 
+                    width: '7%',
+                    cellRenderer: (value, row) => (
+                      <Chip 
+                        label={getStatusText(row.status)} 
+                        color={getStatusColor(row.status) as any}
+                        size="small"
+                      />
+                    )
+                  }
+                ]}
+                emptyMessage="Записи не найдены"
+                isLoading={isLoading}
+                error={error}
+                primaryKeyField="id"
+                stickyHeader
+                size={isTablet ? "small" : "medium"}
+                maxHeight={600}
+                actionComponent={(row) => (
+                  <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
+                    <Tooltip title="Подробности">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDetailsClick(row.id)}
+                      >
+                        <VisibilityIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Редактировать">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleEditBooking(row)}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                )}
+              />
+              
+              {/* Пагинация */}
+              <TablePagination
+                rowsPerPageOptions={[5, 10, 25, 50]}
+                component="div"
+                count={filteredBookings.length}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+                labelRowsPerPage="Строк на странице:"
+                labelDisplayedRows={({ from, to, count }) => `${from}-${to} из ${count}`}
+              />
+            </Box>
+          )}
+        </Box>
+      </Paper>
+
+      {/* Диалоги и уведомления */}
+      {selectedBookingId && (
+        <BookingDetailsDialog
+          bookingId={selectedBookingId}
+          open={!!selectedBookingId}
+          onClose={handleCloseDetails}
+          onStatusChange={handleStatusChange}
+        />
+      )}
+      
+      {editDialogOpen && currentBooking && (
+        <BookingEditDialog
+          booking={currentBooking}
+          open={editDialogOpen}
+          onClose={handleCloseEditDialog}
+          onSave={handleSaveBookingChanges}
+        />
+      )}
+      
+      <Snackbar
+        open={snackbarMessage.open}
+        autoHideDuration={5000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={handleSnackbarClose} 
+          severity={snackbarMessage.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbarMessage.message}
+        </Alert>
+      </Snackbar>
+    </>
+  );
+};
+
+export default BookingsPage;

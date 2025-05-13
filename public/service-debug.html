@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Debug Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 900px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .service-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .service-selector {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        select {
+            padding: 8px;
+            min-width: 250px;
+        }
+        .selected-services {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Service Debug Tool</h1>
+    
+    <div class="section">
+        <h2>1. Fetch All Services</h2>
+        <button id="fetchServices">Fetch Services</button>
+        <div id="serviceResult">
+            <p>Click the button to fetch services...</p>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>2. Service Selector Simulation</h2>
+        <p>This simulates the service selector component behavior:</p>
+        
+        <div class="service-selector">
+            <select id="serviceDropdown">
+                <option value="">Select a service to add</option>
+            </select>
+            <button id="addService">Add Service</button>
+        </div>
+        
+        <div class="selected-services">
+            <h3>Selected Services</h3>
+            <div id="selectedServicesList"></div>
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <h3>Current Data (JSON)</h3>
+            <pre id="currentData">{
+    "service_comments": []
+}</pre>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>3. Service Point API Test</h2>
+        <button id="testServicePoint">Test Service Point API</button>
+        <div id="servicePointResult">
+            <p>Click the button to test the service point API...</p>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let allServices = [];
+        let selectedServices = [];
+        
+        // Fetch all services
+        document.getElementById('fetchServices').addEventListener('click', async () => {
+            try {
+                const response = await fetch('http://localhost:8000/api/services');
+                const result = await response.json();
+                
+                if (result.status === 'success' && Array.isArray(result.data)) {
+                    allServices = result.data;
+                    
+                    // Display the services
+                    const serviceResultDiv = document.getElementById('serviceResult');
+                    serviceResultDiv.innerHTML = `<p>Found ${allServices.length} services:</p>`;
+                    
+                    allServices.forEach(service => {
+                        const serviceDiv = document.createElement('div');
+                        serviceDiv.className = 'service-item';
+                        serviceDiv.innerHTML = `
+                            <strong>ID:</strong> ${service.id}<br>
+                            <strong>Name:</strong> ${service.name}<br>
+                            <strong>Description:</strong> ${service.description || 'N/A'}<br>
+                            <strong>Active:</strong> ${service.is_active ? 'Yes' : 'No'}
+                        `;
+                        serviceResultDiv.appendChild(serviceDiv);
+                    });
+                    
+                    // Populate the dropdown
+                    populateServiceDropdown();
+                } else {
+                    document.getElementById('serviceResult').innerHTML = 
+                        `<p>Error: Unexpected response format</p>
+                         <pre>${JSON.stringify(result, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                document.getElementById('serviceResult').innerHTML = 
+                    `<p>Error fetching services: ${error.message}</p>`;
+            }
+        });
+        
+        // Populate service dropdown
+        function populateServiceDropdown() {
+            const dropdown = document.getElementById('serviceDropdown');
+            
+            // Clear existing options (except the first one)
+            while (dropdown.options.length > 1) {
+                dropdown.remove(1);
+            }
+            
+            // Add services that aren't already selected
+            allServices.filter(service => 
+                !selectedServices.some(s => s.service_id === service.id)
+            ).forEach(service => {
+                const option = document.createElement('option');
+                option.value = service.id;
+                option.textContent = service.name;
+                dropdown.appendChild(option);
+            });
+        }
+        
+        // Handle adding a service
+        document.getElementById('addService').addEventListener('click', () => {
+            const dropdown = document.getElementById('serviceDropdown');
+            const serviceId = Number(dropdown.value);
+            
+            if (serviceId) {
+                const service = allServices.find(s => s.id === serviceId);
+                
+                if (service) {
+                    // Add to selected services
+                    selectedServices.push({
+                        service_id: service.id,
+                        comment: ''
+                    });
+                    
+                    // Update the UI
+                    updateSelectedServicesList();
+                    updateCurrentData();
+                    
+                    // Reset dropdown and repopulate
+                    dropdown.value = '';
+                    populateServiceDropdown();
+                }
+            }
+        });
+        
+        // Update the selected services list
+        function updateSelectedServicesList() {
+            const container = document.getElementById('selectedServicesList');
+            container.innerHTML = '';
+            
+            if (selectedServices.length === 0) {
+                container.innerHTML = '<p>No services selected</p>';
+                return;
+            }
+            
+            selectedServices.forEach((serviceItem, index) => {
+                const service = allServices.find(s => s.id === serviceItem.service_id);
+                const serviceName = service ? service.name : `Service #${serviceItem.service_id}`;
+                
+                const div = document.createElement('div');
+                div.className = 'service-item';
+                div.innerHTML = `
+                    <strong>${serviceName}</strong>
+                    <div style="margin: 10px 0;">
+                        <label>Comment: 
+                            <input type="text" value="${serviceItem.comment || ''}" 
+                                data-index="${index}" class="comment-input">
+                        </label>
+                    </div>
+                    <button class="remove-service" data-index="${index}">Remove</button>
+                `;
+                container.appendChild(div);
+            });
+            
+            // Add event listeners to the remove buttons
+            document.querySelectorAll('.remove-service').forEach(button => {
+                button.addEventListener('click', () => {
+                    const index = Number(button.getAttribute('data-index'));
+                    selectedServices.splice(index, 1);
+                    updateSelectedServicesList();
+                    updateCurrentData();
+                    populateServiceDropdown();
+                });
+            });
+            
+            // Add event listeners to the comment inputs
+            document.querySelectorAll('.comment-input').forEach(input => {
+                input.addEventListener('change', () => {
+                    const index = Number(input.getAttribute('data-index'));
+                    selectedServices[index].comment = input.value;
+                    updateCurrentData();
+                });
+            });
+        }
+        
+        // Update the current data display
+        function updateCurrentData() {
+            document.getElementById('currentData').textContent = JSON.stringify({
+                service_comments: selectedServices
+            }, null, 2);
+        }
+        
+        // Test service point API
+        document.getElementById('testServicePoint').addEventListener('click', async () => {
+            try {
+                // Get a sample service point
+                const response = await fetch('http://localhost:8000/api/service-points');
+                const result = await response.json();
+                
+                let servicePoint;
+                if (result.status === 'success' && Array.isArray(result.data) && result.data.length > 0) {
+                    servicePoint = result.data[0];
+                } else {
+                    throw new Error('No service points found or unexpected response format');
+                }
+                
+                // Display the result
+                const resultDiv = document.getElementById('servicePointResult');
+                resultDiv.innerHTML = `
+                    <h3>Sample Service Point: ${servicePoint.name}</h3>
+                    <p><strong>ID:</strong> ${servicePoint.id}</p>
+                    <p><strong>Services:</strong> ${servicePoint.services ? servicePoint.services.length : 0} services attached</p>
+                `;
+                
+                // If there are service_comments, display them
+                if (servicePoint.service_comments && servicePoint.service_comments.length > 0) {
+                    resultDiv.innerHTML += `<h4>Service Comments:</h4>`;
+                    
+                    servicePoint.service_comments.forEach(comment => {
+                        const serviceName = allServices.find(s => s.id === comment.service_id)?.name || `Service #${comment.service_id}`;
+                        
+                        resultDiv.innerHTML += `
+                            <div class="service-item">
+                                <strong>${serviceName}</strong><br>
+                                <strong>Comment:</strong> ${comment.comment || 'No comment'}
+                            </div>
+                        `;
+                    });
+                } else {
+                    resultDiv.innerHTML += `<p>No service comments found.</p>`;
+                }
+                
+                // Add the full data
+                resultDiv.innerHTML += `
+                    <h4>Full Service Point Data:</h4>
+                    <pre>${JSON.stringify(servicePoint, null, 2)}</pre>
+                `;
+            } catch (error) {
+                document.getElementById('servicePointResult').innerHTML = 
+                    `<p>Error testing service point API: ${error.message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html> 

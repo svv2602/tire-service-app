@@ -1,46 +1,94 @@
-# Getting Started with Create React App
+# Веб-интерфейс для приложения шиномонтажного сервиса
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Описание
+Веб-интерфейс для управления шиномонтажным сервисом. Предоставляет функционал для администраторов и партнеров по управлению сервисными точками, записями клиентов и другими аспектами бизнеса.
 
-## Available Scripts
+## Требования
+- Node.js 16+ и npm
+- Laravel Backend, запущенный на порту 8000
 
-In the project directory, you can run:
+## Установка
+1. Клонируйте репозиторий
+2. Установите зависимости:
+```bash
+cd web-frontend
+npm install
+```
 
-### `npm start`
+## Настройка
+Создайте файл `.env` в корневой директории проекта web-frontend со следующим содержимым:
+```
+PORT=3008
+REACT_APP_API_URL=http://localhost:8000
+```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## Запуск
+### Запуск бэкенда
+Перед запуском веб-интерфейса необходимо запустить бэкенд:
+```bash
+cd backend
+php artisan serve
+```
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### Запуск веб-интерфейса в режиме разработки
+```bash
+cd web-frontend
+npm start
+```
+Или с указанием порта:
+```bash
+npm start -- --port 3008
+```
 
-### `npm test`
+Веб-интерфейс будет доступен по адресу [http://localhost:3008](http://localhost:3008)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Запуск веб-интерфейса в production режиме
+```bash
+npm run build
+npx serve -s build -l 3008
+```
 
-### `npm run build`
+## Тестовые учетные записи
+Можно войти в систему, используя следующие учетные записи:
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Администратор:
+- Email: admin@tyreservice.com
+- Пароль: password
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Партнеры:
+- Email: partner1@tyreservice.com (или partner2@tyreservice.com, partner3@tyreservice.com)
+- Пароль: password
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Клиенты:
+- Email: client1@example.com (или до client5@example.com)
+- Пароль: password
 
-### `npm run eject`
+## Структура проекта
+- `/src/components` - UI компоненты приложения
+- `/src/pages` - Страницы приложения
+- `/src/store` - Хранилище Redux и слайсы
+- `/src/hooks` - Пользовательские хуки
+- `/src/utils` - Утилиты и вспомогательные функции
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## Устранение проблем
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Проблемы с CORS
+Если возникают проблемы с CORS, убедитесь, что бэкенд корректно настроен для принятия запросов с localhost:3008.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+### Проблемы с авторизацией
+При получении ошибки 404 при входе в систему:
+1. Убедитесь, что бэкенд запущен (php artisan serve)
+2. Проверьте наличие маршрута /api/login на сервере
+3. Убедитесь, что введены корректные учетные данные
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+### Команды запуска из корня проекта
+Если вы находитесь в корневой директории проекта, используйте следующие команды:
+```bash
+# Запуск бэкенда
+cd backend
+php artisan serve
 
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+# В отдельном терминале запуск фронтенда
+cd web-frontend
+npm start
+```
