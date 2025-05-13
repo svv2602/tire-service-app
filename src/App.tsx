@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline, GlobalStyles as MuiGlobalStyles } from '@mui/material';
 import GlobalStyles from './components/GlobalStyles';
 import { store } from './store';
 import AdminLayout from './components/layout/AdminLayout';
@@ -40,19 +40,25 @@ const EnhancedLayout: React.FC<LayoutPropsWithTheme> = (props) => {
   return <Layout {...props} />;
 };
 
-// Добавим стили для плавного перехода при смене темы
-const GlobalTransitionStyles = () => (
-  <style jsx global>{`
-    *, *::before, *::after {
-      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
-    }
-  `}</style>
+// Компонент для добавления глобальных стилей плавного перехода
+const ThemeTransitionStyles = () => (
+  <MuiGlobalStyles
+    styles={{
+      '@import': 'url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap")',
+      '*, *::before, *::after': {
+        transition: 'background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease',
+      },
+      'body': {
+        fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+      }
+    }}
+  />
 );
 
 const App: React.FC = () => {
-  // Получаем сохранённый режим темы из localStorage или используем светлую тему по умолчанию
+  // Получаем сохранённый режим темы из localStorage или используем темную тему по умолчанию
   const savedMode = localStorage.getItem('themeMode') as 'light' | 'dark' | null;
-  const [mode, setMode] = useState<'light' | 'dark'>(savedMode || 'light');
+  const [mode, setMode] = useState<'light' | 'dark'>(savedMode || 'dark');
 
   // Создание темы на основе выбранного режима
   const currentTheme = useMemo(() => {
@@ -68,12 +74,17 @@ const App: React.FC = () => {
     });
   };
 
-  // Также проверяем предпочтения системы при первой загрузке
+  // Также проверяем предпочтения системы при первой загрузке, если нет сохраненных предпочтений
   useEffect(() => {
     if (!savedMode) {
+      // По умолчанию устанавливаем темную тему, но все равно проверяем системные настройки
       const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (prefersDarkMode) {
-        setMode('dark');
+      if (!prefersDarkMode) {
+        // Если система предпочитает светлую тему, то можем изменить на светлую
+        setMode('light');
+        localStorage.setItem('themeMode', 'light');
+      } else {
+        // Иначе оставляем темную как по умолчанию
         localStorage.setItem('themeMode', 'dark');
       }
     }
@@ -84,7 +95,7 @@ const App: React.FC = () => {
       <ThemeProvider theme={currentTheme}>
         <CssBaseline />
         <GlobalStyles />
-        <GlobalTransitionStyles />
+        <ThemeTransitionStyles />
         <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ru}>
           <Router>
             <Routes>

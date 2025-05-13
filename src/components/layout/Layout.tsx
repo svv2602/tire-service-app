@@ -1,5 +1,5 @@
-import React from 'react';
-import { Box, Container } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Container, useMediaQuery, useTheme } from '@mui/material';
 import Header from './Header';
 import Footer from './Footer';
 import { Outlet } from 'react-router-dom';
@@ -11,9 +11,21 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, toggleThemeMode, isDarkMode }) => {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const theme = useTheme();
+  
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
+  
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Header toggleThemeMode={toggleThemeMode} isDarkMode={isDarkMode} />
+      <Header 
+        toggleDrawer={handleDrawerToggle} 
+        title="Шиномонтаж"
+        toggleThemeMode={toggleThemeMode} 
+        isDarkMode={isDarkMode} 
+      />
       <Box
         component="main"
         sx={{

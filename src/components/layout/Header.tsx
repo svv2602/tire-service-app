@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   AppBar, 
   Toolbar, 
@@ -11,7 +11,8 @@ import {
   Tooltip,
   Avatar,
   alpha,
-  ButtonProps
+  ButtonProps,
+  useMediaQuery
 } from '@mui/material';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
@@ -22,6 +23,8 @@ import {
   CarRepair as CarRepairIcon
 } from '@mui/icons-material';
 import useScrollPosition from '../../hooks/useScrollPosition';
+import UserMenu from '../auth/UserMenu';
+import ThemeSwitch from '../ui/ThemeSwitch';
 
 // Компонент кнопки с эффектом наведения (без зависимости framer-motion)
 const AnimatedButton: React.FC<ButtonProps> = ({ children, sx, ...props }) => (
@@ -43,15 +46,18 @@ const AnimatedButton: React.FC<ButtonProps> = ({ children, sx, ...props }) => (
 );
 
 interface HeaderProps {
+  toggleDrawer: () => void;
+  title: string;
   toggleThemeMode?: () => void;
   isDarkMode?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ toggleThemeMode, isDarkMode = false }) => {
+const Header: React.FC<HeaderProps> = ({ toggleDrawer, title, toggleThemeMode, isDarkMode }) => {
   const navigate = useNavigate();
   const theme = useTheme();
   const scrollPosition = useScrollPosition();
   const isScrolled = scrollPosition > 10;
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const handleBookingClick = () => {
     navigate('/booking');
@@ -60,93 +66,60 @@ const Header: React.FC<HeaderProps> = ({ toggleThemeMode, isDarkMode = false }) 
   return (
     <AppBar 
       position="fixed"
-      elevation={isScrolled ? 4 : 0}
       sx={{
-        background: isScrolled 
-          ? theme.palette.background.default
-          : 'transparent',
-        transition: 'all 0.3s ease',
-        backdropFilter: isScrolled ? 'blur(10px)' : 'none',
-        color: isScrolled ? theme.palette.text.primary : '#fff'
+        zIndex: (theme) => theme.zIndex.drawer + 1,
+        boxShadow: '0 1px 8px rgba(0,0,0,0.1)',
+        background: theme.palette.mode === 'dark' 
+          ? 'linear-gradient(90deg, rgba(31,41,55,0.95) 0%, rgba(17,24,39,0.97) 100%)' 
+          : 'rgba(255, 255, 255, 0.98)',
+        backdropFilter: 'blur(10px)',
       }}
     >
-      <Container maxWidth="lg">
-        <Toolbar sx={{ py: 1 }}>
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center',
-              flexGrow: 1, 
-              cursor: 'pointer' 
-            }}
-            onClick={() => navigate('/')}
-          >
-            <Avatar 
-              sx={{ 
-                bgcolor: theme.palette.primary.main,
-                mr: 1,
-                width: 40,
-                height: 40,
-                boxShadow: `0 0 8px ${alpha(theme.palette.primary.main, 0.6)}`
-              }}
-            >
-              <CarRepairIcon />
-            </Avatar>
-            <Typography 
-              variant="h6" 
-              component="div"
-              sx={{ 
-                fontWeight: 700,
-                backgroundImage: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
-                backgroundClip: 'text',
-                color: 'transparent',
-                display: { xs: 'none', sm: 'block' }
-              }}
-            >
-              Шиномонтаж
-            </Typography>
-          </Box>
+      <Toolbar>
+        <IconButton
+          color="inherit"
+          aria-label="open drawer"
+          edge="start"
+          onClick={toggleDrawer}
+          sx={{
+            mr: 2,
+            display: { sm: 'none' },
+          }}
+        >
+          <MenuIcon />
+        </IconButton>
+        <Typography
+          variant="h6"
+          noWrap
+          component="div"
+          sx={{ 
+            flexGrow: 1,
+            fontWeight: 600,
+            background: theme.palette.mode === 'dark' 
+              ? 'linear-gradient(90deg, #4C9FFF 0%, #3F8CFF 100%)' 
+              : 'linear-gradient(90deg, #006EE6 0%, #0055B8 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}
+        >
+          {title}
+        </Typography>
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {/* Переключатель темы */}
+          {toggleThemeMode && (
+            <Box sx={{ display: { xs: isMobile ? 'none' : 'flex' }, mr: 1 }}>
+              <ThemeSwitch
+                isDarkMode={!!isDarkMode}
+                toggleThemeMode={toggleThemeMode}
+              />
+            </Box>
+          )}
           
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {toggleThemeMode && (
-              <Tooltip title={isDarkMode ? "Светлая тема" : "Темная тема"}>
-                <IconButton 
-                  color="inherit" 
-                  onClick={toggleThemeMode}
-                  sx={{
-                    borderRadius: '12px',
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
-                    }
-                  }}
-                >
-                  {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
-                </IconButton>
-              </Tooltip>
-            )}
-            
-            <AnimatedButton 
-              variant="contained"
-              color="primary"
-              startIcon={<CalendarIcon />}
-              onClick={handleBookingClick}
-              sx={{
-                borderRadius: '12px',
-                boxShadow: `0 4px 14px ${alpha(theme.palette.primary.main, 0.4)}`,
-                background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
-                '&:hover': {
-                  background: `linear-gradient(90deg, ${theme.palette.primary.dark}, ${theme.palette.primary.main})`,
-                },
-                px: 3,
-                py: 1
-              }}
-            >
-              Записаться
-            </AnimatedButton>
-          </Box>
-        </Toolbar>
-      </Container>
+          {/* Меню пользователя */}
+          <UserMenu toggleThemeMode={toggleThemeMode} isDarkMode={isDarkMode} />
+        </Box>
+      </Toolbar>
     </AppBar>
   );
 };
