@@ -11,6 +11,7 @@ import {
   Tooltip,
   Divider,
   useTheme,
+  Box,
 } from '@mui/material';
 import {
   AccountCircle,
@@ -22,6 +23,7 @@ import {
 import { RootState } from '../../store';
 import { logout } from '../../store/slices/authSlice';
 import { useAppDispatch } from '../../hooks/useAppDispatch';
+import ThemeToggle from '../ui/ThemeToggle';
 
 interface UserMenuProps {
   toggleThemeMode?: () => void;
@@ -59,22 +61,17 @@ const UserMenu: React.FC<UserMenuProps> = ({ toggleThemeMode, isDarkMode }) => {
     }
     handleClose();
   };
+  
   return (
-    <>
+    <Box sx={{ display: 'flex', alignItems: 'center' }}>
       {/* Кнопка переключения темы */}
       {toggleThemeMode && (
-        <Tooltip title={isDarkMode ? "Светлая тема" : "Тёмная тема"}>
-          <IconButton 
-            onClick={toggleThemeMode}
-            color="inherit"
-            sx={{ 
-              ml: 1,
-              display: { xs: 'none', md: 'flex' } // Скрыть на мобильных
-            }}
-          >
-            {isDarkMode ? <Brightness7 /> : <Brightness4 />}
-          </IconButton>
-        </Tooltip>
+        <Box sx={{ display: { xs: 'none', md: 'flex' } }}>
+          <ThemeToggle 
+            isDarkMode={!!isDarkMode} 
+            toggleThemeMode={toggleThemeMode} 
+          />
+        </Box>
       )}
       
       {/* Кнопка пользователя */}
@@ -82,8 +79,27 @@ const UserMenu: React.FC<UserMenuProps> = ({ toggleThemeMode, isDarkMode }) => {
         size="large"
         onClick={handleMenu}
         color="inherit"
+        sx={{
+          ml: 1,
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            transform: 'scale(1.05)',
+          }
+        }}
       >
-        <Avatar sx={{ width: 32, height: 32 }}>
+        <Avatar 
+          sx={{ 
+            width: 32, 
+            height: 32,
+            backgroundColor: theme.palette.primary.main,
+            color: theme.palette.primary.contrastText,
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              boxShadow: `0 0 8px ${theme.palette.primary.main}`,
+            }
+          }}
+        >
           <AccountCircle />
         </Avatar>
       </IconButton>
@@ -102,17 +118,42 @@ const UserMenu: React.FC<UserMenuProps> = ({ toggleThemeMode, isDarkMode }) => {
         }}
         open={Boolean(anchorEl)}
         onClose={handleClose}
+        PaperProps={{
+          elevation: 3,
+          sx: {
+            overflow: 'visible',
+            filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+            mt: 1.5,
+            borderRadius: 2,
+            minWidth: 200,
+            '&:before': {
+              content: '""',
+              display: 'block',
+              position: 'absolute',
+              top: 0,
+              right: 14,
+              width: 10,
+              height: 10,
+              bgcolor: 'background.paper',
+              transform: 'translateY(-50%) rotate(45deg)',
+              zIndex: 0,
+            },
+          },
+        }}
       >
         <MenuItem onClick={handleClose}>
           <ListItemIcon>
-            <AccountCircle fontSize="small" />
+            <AccountCircle fontSize="small" color="primary" />
           </ListItemIcon>
-          <ListItemText primary={user?.email || 'Профиль'} />
+          <ListItemText 
+            primary={user?.email || 'Профиль'} 
+            primaryTypographyProps={{ fontWeight: 'medium' }}
+          />
         </MenuItem>
         
         <MenuItem onClick={handleSettings}>
           <ListItemIcon>
-            <Settings fontSize="small" />
+            <Settings fontSize="small" color="primary" />
           </ListItemIcon>
           <ListItemText primary="Настройки" />
         </MenuItem>
@@ -121,21 +162,24 @@ const UserMenu: React.FC<UserMenuProps> = ({ toggleThemeMode, isDarkMode }) => {
         {toggleThemeMode && (
           <MenuItem onClick={handleThemeToggle}>
             <ListItemIcon>
-              {isDarkMode ? <Brightness7 fontSize="small" /> : <Brightness4 fontSize="small" />}
+              {isDarkMode ? 
+                <Brightness7 fontSize="small" color="primary" /> : 
+                <Brightness4 fontSize="small" color="primary" />
+              }
             </ListItemIcon>
             <ListItemText primary={isDarkMode ? "Светлая тема" : "Тёмная тема"} />
           </MenuItem>
         )}
         
         <Divider />
-        <MenuItem onClick={handleLogout}>
+        <MenuItem onClick={handleLogout} sx={{ color: theme.palette.error.main }}>
           <ListItemIcon>
-            <Logout fontSize="small" />
+            <Logout fontSize="small" color="error" />
           </ListItemIcon>
           <ListItemText primary="Выйти" />
         </MenuItem>
       </Menu>
-    </>
+    </Box>
   );
 };
 

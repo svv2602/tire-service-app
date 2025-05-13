@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { ThemeProvider, CssBaseline } from '@mui/material';
@@ -40,9 +40,19 @@ const EnhancedLayout: React.FC<LayoutPropsWithTheme> = (props) => {
   return <Layout {...props} />;
 };
 
+// Добавим стили для плавного перехода при смене темы
+const GlobalTransitionStyles = () => (
+  <style jsx global>{`
+    *, *::before, *::after {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+  `}</style>
+);
+
 const App: React.FC = () => {
-  // Состояние для хранения текущего режима темы (светлая или темная)
-  const [mode, setMode] = useState<'light' | 'dark'>('light');
+  // Получаем сохранённый режим темы из localStorage или используем светлую тему по умолчанию
+  const savedMode = localStorage.getItem('themeMode') as 'light' | 'dark' | null;
+  const [mode, setMode] = useState<'light' | 'dark'>(savedMode || 'light');
 
   // Создание темы на основе выбранного режима
   const currentTheme = useMemo(() => {
@@ -51,14 +61,30 @@ const App: React.FC = () => {
 
   // Функция для переключения режима темы
   const toggleThemeMode = () => {
-    setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
+    setMode((prevMode) => {
+      const newMode = prevMode === 'light' ? 'dark' : 'light';
+      localStorage.setItem('themeMode', newMode);
+      return newMode;
+    });
   };
+
+  // Также проверяем предпочтения системы при первой загрузке
+  useEffect(() => {
+    if (!savedMode) {
+      const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDarkMode) {
+        setMode('dark');
+        localStorage.setItem('themeMode', 'dark');
+      }
+    }
+  }, [savedMode]);
 
   return (
     <Provider store={store}>
       <ThemeProvider theme={currentTheme}>
         <CssBaseline />
         <GlobalStyles />
+        <GlobalTransitionStyles />
         <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={ru}>
           <Router>
             <Routes>
